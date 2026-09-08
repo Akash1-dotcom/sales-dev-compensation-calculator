@@ -12,10 +12,10 @@ function MetricCard({ label, value, sublabel, tone = 'default' }: MetricCardProp
   const toneClass =
     tone === 'success' ? 'text-success' : tone === 'attention' ? 'text-attention' : 'text-fg';
   return (
-    <div className="rounded-lg border border-border bg-canvas-subtle p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>
-      {sublabel && <p className="mt-1 text-xs text-fg-subtle">{sublabel}</p>}
+    <div className="rounded-md border border-border-muted bg-canvas-subtle/60 px-3 py-2.5">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-fg-muted">{label}</p>
+      <p className={`mt-0.5 text-xl font-semibold ${toneClass}`}>{value}</p>
+      {sublabel && <p className="mt-0.5 text-xs text-fg-subtle">{sublabel}</p>}
     </div>
   );
 }

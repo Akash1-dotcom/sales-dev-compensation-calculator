@@ -15,11 +15,10 @@ import { ScenarioComparison } from './components/ScenarioComparison';
 import { PlanDetails } from './components/PlanDetails';
 import { UploadPlanModal } from './components/UploadPlanModal';
 
-type Tab = 'dashboard' | 'planner' | 'comparison' | 'plan-details';
+type Tab = 'dashboard' | 'comparison' | 'plan-details';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
-  { id: 'planner', label: 'What-If Planner' },
   { id: 'comparison', label: 'Comparison' },
   { id: 'plan-details', label: 'Plan Details' },
 ];
@@ -85,20 +84,35 @@ export default function App() {
     handlePlanChange(BUNDLED_PLANS[0]?.planId ?? '');
   };
 
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
   return (
     <div className="min-h-screen bg-canvas">
       {/* Header */}
       <header className="border-b border-border bg-canvas-subtle">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
-            <svg viewBox="0 0 16 16" className="h-6 w-6 fill-fg" aria-hidden>
+            <svg viewBox="0 0 16 16" className="h-5 w-5 fill-fg" aria-hidden>
               <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
             </svg>
-            <div>
-              <h1 className="text-sm font-semibold text-fg">Compensation Calculator</h1>
-              <p className="text-xs text-fg-muted">Modeled from the plan PDF · local, no backend</p>
-            </div>
+            <h1 className="text-sm font-semibold text-fg">Compensation Calculator</h1>
           </div>
+
+          <div className="flex items-center gap-1 rounded-md border border-border bg-canvas p-0.5">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                  tab === t.id ? 'bg-canvas-subtle text-fg shadow-sm' : 'text-fg-muted hover:text-fg'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <PlanSelector plans={plans} selectedPlanId={plan.planId} onChange={handlePlanChange} />
             <button
@@ -106,7 +120,7 @@ export default function App() {
               onClick={() => setUploadOpen(true)}
               className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-fg hover:bg-canvas"
             >
-              Upload plan PDF
+              Upload plan
             </button>
             {isCustomPlan && (
               <button
@@ -114,43 +128,31 @@ export default function App() {
                 onClick={handleRemoveCustomPlan}
                 className="rounded-md border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/10"
               >
-                Remove plan
+                Remove
               </button>
             )}
           </div>
         </div>
-
-        {/* Tabs */}
-        <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 sm:px-6" aria-label="Sections">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-                tab === t.id
-                  ? 'border-accent text-fg'
-                  : 'border-transparent text-fg-muted hover:border-border hover:text-fg'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </nav>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
+      <main className="mx-auto max-w-5xl space-y-5 px-4 py-6 sm:px-6">
         {tab === 'dashboard' && (
           <>
-            <section className="rounded-lg border border-border bg-canvas-subtle p-4">
-              <h2 className="mb-3 text-sm font-semibold text-fg">Scenario inputs</h2>
+            <section>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-fg">Scenario</h2>
+                <button
+                  type="button"
+                  onClick={handleSaveScenario}
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-fg hover:bg-canvas-subtle"
+                >
+                  Save scenario
+                </button>
+              </div>
               <ScenarioForm plan={plan} inputs={inputs} onChange={setInputs} />
             </section>
 
-            <section>
-              <h2 className="mb-3 text-sm font-semibold text-fg">Results</h2>
-              <MetricsGrid result={result} />
-            </section>
+            <MetricsGrid result={result} />
 
             <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <PayoutChart
@@ -169,40 +171,30 @@ export default function App() {
               />
             </section>
 
-            <section className="space-y-4">
-              <h2 className="text-sm font-semibold text-fg">Detailed calculation breakdown</h2>
-              <TierBreakdownTable result={result.pipeline} />
-              <TierBreakdownTable result={result.sql} />
-            </section>
-          </>
-        )}
-
-        {tab === 'planner' && (
-          <>
-            <section className="rounded-lg border border-border bg-canvas-subtle p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-fg">What-if scenario planner</h2>
-                <button
-                  type="button"
-                  onClick={handleSaveScenario}
-                  className="rounded-md bg-success-emphasis px-3 py-1.5 text-sm font-medium text-white hover:bg-success"
-                >
-                  Save scenario
-                </button>
-              </div>
-              <ScenarioForm plan={plan} inputs={inputs} onChange={setInputs} />
-            </section>
-
-            <section>
-              <MetricsGrid result={result} />
-            </section>
-
             <EarningsProjection
               pipelineComponent={pipelineComponent}
               sqlComponent={sqlComponent}
               quarterId={inputs.quarterId}
               monthId={inputs.monthId}
             />
+
+            <section>
+              <button
+                type="button"
+                onClick={() => setShowBreakdown((v) => !v)}
+                className="flex w-full items-center justify-between rounded-md border border-border bg-canvas-subtle px-4 py-2.5 text-sm font-semibold text-fg hover:bg-canvas"
+                aria-expanded={showBreakdown}
+              >
+                Detailed calculation breakdown
+                <span className="text-fg-muted">{showBreakdown ? '−' : '+'}</span>
+              </button>
+              {showBreakdown && (
+                <div className="mt-3 space-y-4">
+                  <TierBreakdownTable result={result.pipeline} />
+                  <TierBreakdownTable result={result.sql} />
+                </div>
+              )}
+            </section>
           </>
         )}
 
