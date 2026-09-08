@@ -92,9 +92,10 @@ export function ScenarioForm({ plan, inputs, onChange }: ScenarioFormProps) {
           type="number"
           min={0}
           step={1}
+          inputMode="numeric"
           className="w-full rounded-md border border-border bg-canvas-inset px-3 py-2 text-sm text-fg focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           value={inputs.sqlGenerated}
-          onChange={(e) => onChange({ ...inputs, sqlGenerated: Number(e.target.value) || 0 })}
+          onChange={(e) => onChange({ ...inputs, sqlGenerated: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
         />
       </div>
     </div>

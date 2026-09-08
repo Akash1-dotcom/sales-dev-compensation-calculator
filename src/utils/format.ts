@@ -38,5 +38,5 @@ export function formatNumber(value: number, fractionDigits = 0): string {
 
 /** Formats an amount using the component's unit: currency for Pipeline, plain count for SQL. */
 export function formatByUnit(value: number, unit: 'currency' | 'count'): string {
-  return unit === 'currency' ? formatCurrency(value) : `${formatNumber(value, 1)} SQLs`;
+  return unit === 'currency' ? formatCurrency(value) : `${formatNumber(Math.round(value), 0)} SQLs`;
 }

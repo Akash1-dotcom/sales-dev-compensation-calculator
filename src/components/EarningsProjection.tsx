@@ -30,7 +30,7 @@ export function EarningsProjection({ pipelineComponent, sqlComponent, quarterId,
 
   const sqlProjection = useMemo(() => {
     if (!sqlPeriod) return null;
-    const amount = pctToAmount(sqlPct, sqlPeriod.quota);
+    const amount = Math.round(pctToAmount(sqlPct, sqlPeriod.quota));
     return calculateComponentResult(sqlComponent, monthId, amount);
   }, [sqlComponent, monthId, sqlPct, sqlPeriod]);
 
@@ -82,7 +82,7 @@ export function EarningsProjection({ pipelineComponent, sqlComponent, quarterId,
           />
           {sqlPeriod && (
             <p className="mt-2 text-xs text-fg-subtle">
-              {formatByUnit(pctToAmount(sqlPct, sqlPeriod.quota), 'count')} generated
+              {formatByUnit(Math.round(pctToAmount(sqlPct, sqlPeriod.quota)), 'count')} generated
             </p>
           )}
           <p className="mt-1 text-xl font-semibold text-success">{formatCurrency(sqlProjection?.totalPayout ?? 0)}</p>
