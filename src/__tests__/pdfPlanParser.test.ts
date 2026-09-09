@@ -111,3 +111,72 @@ describe('parsePlanFromText', () => {
     ]);
   });
 });
+
+// A condensed reproduction of pdf.js's *actual* extraction order for a real
+// GitHub Revenue Compensation Exhibit: labels are read left-to-right within
+// each table row, which for the "Component Quotas" table means both
+// "Quarter 1" and "Quarter 2" headers appear *before* either quarter's
+// actual quota value. A naive "grab the first number after 'Quarter 1'"
+// parse previously matched the "2" inside the literal text "Quarter 2"
+// (which appears between the "Quarter 1" label and the real 800,000 value)
+// instead of the real quota - this regression test locks in the fix.
+const REAL_WORLD_ORDER_PDF_TEXT = `
+GitHub Revenue Compensation Exhibit
+Participant: Shambhavi Chhabra
+Geo
+APAC EBR IN
+Plan Period: H1 FY27 (July 1, 2026 - December 31, 2026)
+
+Component Quotas
+Geo
+APAC EBR IN
+Plan Components
+Component Quotas Quarter 1
+All values are in USD ($)
+Quarter 2
+All values are in USD ($)
+Sourced Pipeline
+(Quarterly Quotas)
+800,000
+800,000
+Monthly SQL Quota
+Sales Qualified Lead (SQL)
+(Monthly Quotas)
+13
+
+Total Plan Period
+TIC
+4,178.48
+
+Pipeline - Quarter 1 30% 1,253.54 0.1567%
+Pipeline - Quarter 2 30% 1,253.54 0.1567%
+Sales Qualified Leads
+(SQL) 40% 1,671.39 21.43%
+
+Pipeline Rates
+0.00% - 100.00% Base Rate
+100.01% - 200.00% 110% x Base Rate
+200.01% - 250.00% 125% x Base Rate
+250.01% + 100% x Base Rate
+
+SQL Rates
+0.00% - 100.00% Base Rate
+100.01% - 125.00% 110% x Base Rate
+125.01% - 150.00% 120% x Base Rate
+150.01% - 400.00% 130% x Base Rate
+`;
+
+describe('parsePlanFromText with real-world PDF text ordering', () => {
+  const { plan } = parsePlanFromText(REAL_WORLD_ORDER_PDF_TEXT, 'callidus.pdf');
+  const pipeline = plan.components.find((c) => c.id === 'pipeline')!;
+  const sql = plan.components.find((c) => c.id === 'sql')!;
+
+  it('extracts the real 800,000 pipeline quota for both quarters, not the "2" from the "Quarter 2" label', () => {
+    expect(pipeline.quotaPeriods[0].quota).toBe(800000);
+    expect(pipeline.quotaPeriods[1].quota).toBe(800000);
+  });
+
+  it('extracts the monthly SQL quota', () => {
+    expect(sql.quotaPeriods[0].quota).toBe(13);
+  });
+});

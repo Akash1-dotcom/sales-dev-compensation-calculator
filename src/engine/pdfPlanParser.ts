@@ -77,10 +77,21 @@ function extractTierTable(text: string, tableHeading: string, otherHeadings: str
   return tiers;
 }
 
-/** Finds the first currency amount (e.g. "800,000" or "$800,000") following a label. */
+/**
+ * Finds the first *quota-shaped* amount (e.g. "800,000" or "$800,000")
+ * following a label. Quota amounts always have thousands-separator commas
+ * or are at least 3 digits (100+) - this deliberately excludes 1-2 digit
+ * numbers so it can't accidentally match the "1" in "Quarter 1" or the "2"
+ * in "Quarter 2" when those labels themselves appear before the real
+ * number in the PDF's extracted text order (tables often extract as
+ * "label label ... value value" rather than "label value label value").
+ */
 function extractAmountAfter(text: string, label: string, occurrence = 0): number | null {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(`${escaped}[\\s\\S]{0,400}?\\$?([\\d][\\d,]*(?:\\.\\d+)?)`, 'gi');
+  const pattern = new RegExp(
+    `${escaped}[\\s\\S]{0,400}?\\$?(\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d{3,}(?:\\.\\d+)?)`,
+    'gi',
+  );
   const matches = [...text.matchAll(pattern)];
   const m = matches[occurrence];
   return m ? toNumber(m[1]) : null;
@@ -122,11 +133,23 @@ export function parsePlanFromText(rawText: string, sourceFileName: string): Pars
   const text = rawText.replace(/\r/g, '');
   const warnings: ParsedPlanWarning[] = [];
 
-  const participantMatch = text.match(/Participant:?\s*([A-Za-z][A-Za-z .'-]{2,60})/);
+  // A person's name is at most a few words - bound it tightly and stop at
+  // the next known label ("Effective Date"), a newline, or end of string
+  // (using a lookahead so we don't require one of those literally at the
+  // very end) so the match can't bleed into adjacent fields when the PDF's
+  // text-extraction order interleaves labels and values (e.g. "Participant:
+  // Jane Doe Effective Date: 7/1/2026").
+  const participantMatch = text.match(
+    /Participant:?\s*([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*){0,3}?)\s*(?=Effective Date|Geo|\n|$)/,
+  );
   const participant = participantMatch?.[1]?.trim();
   if (!participant) warnings.push({ field: 'participant', message: 'Could not find a Participant name.' });
 
-  const geoMatch = text.match(/Geo\s*\n?\s*([A-Z][A-Za-z0-9 /]{2,40})/);
+  // Same bleed-through risk as Participant above - a Geo value is a short
+  // code like "APAC EBR IN", so stop at the next known label.
+  const geoMatch = text.match(
+    /Geo\s*\n?\s*([A-Z][A-Za-z0-9 /]{2,30}?)\s*(?=Plan Components|Component Quotas|\n|$)/,
+  );
   const geo = geoMatch?.[1]?.trim();
 
   const planPeriodMatch = text.match(/Plan Period:?\s*([A-Za-z0-9 ]+FY\d{2})\s*\(([^)]+)\)/);
@@ -145,22 +168,6 @@ export function parsePlanFromText(rawText: string, sourceFileName: string): Pars
     warnings.push({ field: 'planPeriod', message: 'Could not confidently parse the plan period date range.' });
   }
 
-  const totalTICMatch = text.match(/Total Plan Period\s*\n?\s*TIC[\s\S]{0,200}?([\d][\d,]*\.\d+)/i);
-  const totalPlanPeriodTIC = totalTICMatch ? toNumber(totalTICMatch[1]) : 0;
-  if (!totalTICMatch) warnings.push({ field: 'totalPlanPeriodTIC', message: 'Could not find Total Plan Period TIC.' });
-
-  // Pipeline: Quarter 1 / Quarter 2 quotas, from the "Component Quotas" section.
-  const q1Quota = extractAmountAfter(text, 'Quarter 1', 0) ?? 0;
-  const q2Quota = extractAmountAfter(text, 'Quarter 2', 0) ?? 0;
-  if (!q1Quota || !q2Quota) {
-    warnings.push({ field: 'pipeline.quota', message: 'Could not confidently find Quarter 1 / Quarter 2 Sourced Pipeline quotas.' });
-  }
-
-  // SQL monthly quota, e.g. "Monthly SQL Quota ... 13"
-  const sqlQuotaMatch = text.match(/Monthly SQL Quota[\s\S]{0,120}?(\d+)/i);
-  const sqlQuota = sqlQuotaMatch ? toNumber(sqlQuotaMatch[1]) : 0;
-  if (!sqlQuotaMatch) warnings.push({ field: 'sql.quota', message: 'Could not find Monthly SQL Quota.' });
-
   // Component TIC + weighting rows, e.g. "Pipeline - Quarter 1 30% 1,253.54 0.1567%"
   const pipelineQ1Row = text.match(/Pipeline\s*-\s*Quarter 1\s*(\d+(?:\.\d+)?)%\s*([\d,]+\.\d+)/i);
   const pipelineQ2Row = text.match(/Pipeline\s*-\s*Quarter 2\s*(\d+(?:\.\d+)?)%\s*([\d,]+\.\d+)/i);
@@ -178,6 +185,31 @@ export function parsePlanFromText(rawText: string, sourceFileName: string): Pars
   if (!sqlRow) {
     warnings.push({ field: 'sql.componentTIC', message: 'Could not confidently find SQL Component TIC - please verify.' });
   }
+
+  // "Total Plan Period TIC" is meant to equal the sum of every component's
+  // TIC (Pipeline Q1 + Pipeline Q2 + SQL) - it's just as reliable, and far
+  // less prone to table-column reordering, to compute it from those already
+  // -parsed values than to regex-match a single figure out of the table
+  // (whose real total can land many cells away from the "Total Plan Period
+  // TIC" heading depending on how the PDF's columns were laid out).
+  const componentTICSum = pipelineQ1TIC + pipelineQ2TIC + sqlTIC;
+  const totalTICMatch = text.match(/Total Plan Period\s*\n?\s*TIC[\s\S]{0,200}?([\d][\d,]*\.\d+)/i);
+  const totalPlanPeriodTIC = componentTICSum > 0 ? componentTICSum : totalTICMatch ? toNumber(totalTICMatch[1]) : 0;
+  if (componentTICSum <= 0 && !totalTICMatch) {
+    warnings.push({ field: 'totalPlanPeriodTIC', message: 'Could not find Total Plan Period TIC.' });
+  }
+
+  // Pipeline: Quarter 1 / Quarter 2 quotas, from the "Component Quotas" section.
+  const q1Quota = extractAmountAfter(text, 'Quarter 1', 0) ?? 0;
+  const q2Quota = extractAmountAfter(text, 'Quarter 2', 0) ?? 0;
+  if (!q1Quota || !q2Quota) {
+    warnings.push({ field: 'pipeline.quota', message: 'Could not confidently find Quarter 1 / Quarter 2 Sourced Pipeline quotas.' });
+  }
+
+  // SQL monthly quota, e.g. "Monthly SQL Quota ... 13"
+  const sqlQuotaMatch = text.match(/Monthly SQL Quota[\s\S]{0,120}?(\d+)/i);
+  const sqlQuota = sqlQuotaMatch ? toNumber(sqlQuotaMatch[1]) : 0;
+  if (!sqlQuotaMatch) warnings.push({ field: 'sql.quota', message: 'Could not find Monthly SQL Quota.' });
 
   const pipelineTiers = extractTierTable(text, 'Pipeline Rates', ['SQL Rates', 'Draw']);
   const sqlTiers = extractTierTable(text, 'SQL Rates', ['Draw']);
