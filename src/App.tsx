@@ -86,9 +86,15 @@ export default function App() {
   };
 
   const handlePlanUploaded = (uploadedPlan: CompensationPlan) => {
+    // Don't route through handlePlanChange here: it reads `plans` from the
+    // React state closure, which is still stale at this point (setCustomPlans
+    // hasn't applied yet) and would not contain the just-uploaded plan -
+    // leaving `inputs` pointed at an empty/undefined period and crashing the
+    // very next render. Derive planId/inputs straight from uploadedPlan instead.
     const next = saveCustomPlan(uploadedPlan);
     setCustomPlans(next);
-    handlePlanChange(uploadedPlan.planId);
+    setPlanId(uploadedPlan.planId);
+    setInputs(defaultInputsFor(uploadedPlan));
   };
 
   const handleRemoveCustomPlan = () => {
@@ -96,7 +102,8 @@ export default function App() {
     if (!window.confirm(`Remove uploaded plan "${plan.planName}"? This cannot be undone.`)) return;
     const next = removeCustomPlan(plan.planId);
     setCustomPlans(next);
-    handlePlanChange(next[0]?.planId ?? '');
+    setPlanId(next[0]?.planId ?? '');
+    setInputs(defaultInputsFor(next[0]));
   };
 
   const [showBreakdown, setShowBreakdown] = useState(false);
