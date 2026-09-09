@@ -43,16 +43,24 @@ export default function App() {
   // an upload prompt.
   const [customPlans, setCustomPlans] = useState<CompensationPlan[]>([]);
   const [plansLoaded, setPlansLoaded] = useState(false);
+  const [planId, setPlanId] = useState('');
+  const [inputs, setInputs] = useState<ScenarioInputs>(() => defaultInputsFor(undefined));
+
   useEffect(() => {
-    setCustomPlans(loadCustomPlans());
+    const loaded = loadCustomPlans();
+    setCustomPlans(loaded);
     setPlansLoaded(true);
+    // Plans are loaded from localStorage asynchronously; once available,
+    // point the scenario at the first one so `inputs` (period ids, etc.)
+    // always matches an actual plan and never references a stale/empty period.
+    if (loaded.length > 0) {
+      setPlanId(loaded[0].planId);
+      setInputs(defaultInputsFor(loaded[0]));
+    }
   }, []);
   const plans = customPlans;
 
-  const [planId, setPlanId] = useState('');
   const plan = useMemo(() => plans.find((p) => p.planId === planId) ?? plans[0], [plans, planId]);
-
-  const [inputs, setInputs] = useState<ScenarioInputs>(() => defaultInputsFor(undefined));
   const [tab, setTab] = useState<Tab>('dashboard');
   const [scenarios, setScenarios] = useLocalStorageState<SavedScenario[]>('comp-calc:scenarios', []);
   const [uploadOpen, setUploadOpen] = useState(false);
