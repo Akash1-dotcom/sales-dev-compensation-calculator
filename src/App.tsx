@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { PLANS as BUNDLED_PLANS, DEFAULT_PLAN_ID } from './data/plans';
 import { loadCustomPlans, removeCustomPlan, saveCustomPlan } from './data/customPlans';
 import { calculateScenario, type ScenarioInputs } from './engine/planEngine';
 import type { CompensationPlan } from './types/compensationPlan';
@@ -32,28 +31,36 @@ function defaultInputsFor(plan: CompensationPlan | undefined): ScenarioInputs {
   };
 }
 
+const LOGO = (
+  <svg viewBox="0 0 16 16" className="h-5 w-5 fill-fg" aria-hidden>
+    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+  </svg>
+);
+
 export default function App() {
-  // Bundled plans ship with the app; custom plans are uploaded PDFs parsed
-  // and stored locally so different teams' plans can be added without a
-  // code change or rebuild.
+  // Every plan comes from an uploaded compensation PDF - there is no
+  // bundled/demo plan. Until at least one is uploaded, the app only shows
+  // an upload prompt.
   const [customPlans, setCustomPlans] = useState<CompensationPlan[]>([]);
+  const [plansLoaded, setPlansLoaded] = useState(false);
   useEffect(() => {
     setCustomPlans(loadCustomPlans());
+    setPlansLoaded(true);
   }, []);
-  const plans = useMemo(() => [...BUNDLED_PLANS, ...customPlans], [customPlans]);
+  const plans = customPlans;
 
-  const [planId, setPlanId] = useState(DEFAULT_PLAN_ID);
+  const [planId, setPlanId] = useState('');
   const plan = useMemo(() => plans.find((p) => p.planId === planId) ?? plans[0], [plans, planId]);
 
-  const [inputs, setInputs] = useState<ScenarioInputs>(() => defaultInputsFor(plans[0]));
+  const [inputs, setInputs] = useState<ScenarioInputs>(() => defaultInputsFor(undefined));
   const [tab, setTab] = useState<Tab>('dashboard');
   const [scenarios, setScenarios] = useLocalStorageState<SavedScenario[]>('comp-calc:scenarios', []);
   const [uploadOpen, setUploadOpen] = useState(false);
 
-  const result = useMemo(() => calculateScenario(plan, inputs), [plan, inputs]);
+  const result = useMemo(() => (plan ? calculateScenario(plan, inputs) : null), [plan, inputs]);
 
-  const pipelineComponent = plan.components.find((c) => c.id === 'pipeline')!;
-  const sqlComponent = plan.components.find((c) => c.id === 'sql')!;
+  const pipelineComponent = plan?.components.find((c) => c.id === 'pipeline');
+  const sqlComponent = plan?.components.find((c) => c.id === 'sql');
 
   const handlePlanChange = (nextPlanId: string) => {
     setPlanId(nextPlanId);
@@ -61,11 +68,12 @@ export default function App() {
   };
 
   const handleSaveScenario = () => {
+    if (!plan) return;
     const name = window.prompt('Name this scenario', `Scenario ${scenarios.length + 1}`);
     if (!name) return;
     setScenarios([
       ...scenarios,
-      { id: crypto.randomUUID(), name, planId, inputs, createdAt: new Date().toISOString() },
+      { id: crypto.randomUUID(), name, planId: plan.planId, inputs, createdAt: new Date().toISOString() },
     ]);
   };
 
@@ -75,16 +83,59 @@ export default function App() {
     handlePlanChange(uploadedPlan.planId);
   };
 
-  const isCustomPlan = customPlans.some((p) => p.planId === plan.planId);
   const handleRemoveCustomPlan = () => {
-    if (!isCustomPlan) return;
+    if (!plan) return;
     if (!window.confirm(`Remove uploaded plan "${plan.planName}"? This cannot be undone.`)) return;
     const next = removeCustomPlan(plan.planId);
     setCustomPlans(next);
-    handlePlanChange(BUNDLED_PLANS[0]?.planId ?? '');
+    handlePlanChange(next[0]?.planId ?? '');
   };
 
   const [showBreakdown, setShowBreakdown] = useState(false);
+
+  // Nothing uploaded yet: show a single upload gate instead of the calculator.
+  if (plansLoaded && !plan) {
+    return (
+      <div className="flex min-h-screen flex-col bg-canvas">
+        <header className="border-b border-border bg-canvas-subtle">
+          <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3 sm:px-6">
+            {LOGO}
+            <h1 className="text-sm font-semibold text-fg">Compensation Calculator</h1>
+          </div>
+        </header>
+
+        <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-4 py-16 text-center sm:px-6">
+          <svg viewBox="0 0 16 16" className="mb-4 h-10 w-10 fill-fg-muted" aria-hidden>
+            <path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14H2.75Z" />
+            <path d="M7.25 7.689 5.03 9.91a.75.75 0 0 1-1.06-1.06l3.5-3.5a.75.75 0 0 1 1.06 0l3.5 3.5a.75.75 0 1 1-1.06 1.06L8.75 7.689V12a.75.75 0 0 1-1.5 0V7.689Z" />
+          </svg>
+          <h2 className="text-base font-semibold text-fg">Upload a compensation plan to get started</h2>
+          <p className="mt-2 max-w-md text-sm text-fg-muted">
+            This calculator has no built-in demo plan. Upload your team's compensation plan PDF and every quota,
+            weighting, base rate and accelerator tier is extracted automatically - entirely in your browser.
+          </p>
+          <button
+            type="button"
+            onClick={() => setUploadOpen(true)}
+            className="mt-6 rounded-md bg-success-emphasis px-4 py-2 text-sm font-medium text-white hover:bg-success"
+          >
+            Upload plan PDF
+          </button>
+        </main>
+
+        <footer className="border-t border-border py-6 text-center text-xs text-fg-subtle">
+          All calculations run locally in your browser. No data leaves this device.
+        </footer>
+
+        <UploadPlanModal open={uploadOpen} onClose={() => setUploadOpen(false)} onSave={handlePlanUploaded} />
+      </div>
+    );
+  }
+
+  if (!plan || !result || !pipelineComponent || !sqlComponent) {
+    // Plans are still loading from localStorage on first render.
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -92,9 +143,7 @@ export default function App() {
       <header className="border-b border-border bg-canvas-subtle">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
-            <svg viewBox="0 0 16 16" className="h-5 w-5 fill-fg" aria-hidden>
-              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
-            </svg>
+            {LOGO}
             <h1 className="text-sm font-semibold text-fg">Compensation Calculator</h1>
           </div>
 
@@ -122,18 +171,17 @@ export default function App() {
             >
               Upload plan
             </button>
-            {isCustomPlan && (
-              <button
-                type="button"
-                onClick={handleRemoveCustomPlan}
-                className="rounded-md border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/10"
-              >
-                Remove
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleRemoveCustomPlan}
+              className="rounded-md border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/10"
+            >
+              Remove
+            </button>
           </div>
         </div>
       </header>
+
 
       <main className="mx-auto max-w-5xl space-y-5 px-4 py-6 sm:px-6">
         {tab === 'dashboard' && (

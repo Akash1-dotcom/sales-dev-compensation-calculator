@@ -1,20 +1,16 @@
 /**
  * Compensation Plan Registry
  * ==========================
- * To support a NEW compensation plan PDF, you do not need to touch any
- * calculation or UI code:
- *   1. Extract its rules into a JSON file matching `CompensationPlan`
- *      (see src/types/compensationPlan.ts for the schema, and
- *      github-h1-fy27.plan.json for a worked example).
- *   2. Drop the JSON file in this folder.
- *   3. Import + register it in the `PLANS` array below.
- * The plan then appears automatically in the plan selector, and every
- * calculation, chart, and comparison in the app is driven from its data.
+ * This app ships with NO bundled/demo compensation plan — every team's plan
+ * is supplied by uploading their compensation PDF in the app (parsed by
+ * `src/engine/pdfPlanParser.ts` and stored locally, see
+ * `src/data/customPlans.ts`). `github-h1-fy27.plan.json` is kept only as a
+ * reference fixture for the calculation-engine unit tests; it is
+ * intentionally NOT exported here so it never appears in the app itself.
  */
 import type { CompensationPlan } from '../../types/compensationPlan';
-import githubH1FY27 from './github-h1-fy27.plan.json';
 
-export const PLANS: CompensationPlan[] = [githubH1FY27 as unknown as CompensationPlan];
+export const PLANS: CompensationPlan[] = [];
 
 export function getPlanById(planId: string): CompensationPlan | undefined {
   return PLANS.find((p) => p.planId === planId);

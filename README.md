@@ -1,13 +1,15 @@
 # GitHub Compensation Calculator
 
-A local, backend-free compensation calculator that models a GitHub Revenue
-Compensation Exhibit exactly as extracted from the source PDF ("H1 FY27,
-APAC EBR IN" plan is included as a worked example) and lets you calculate
-projected earnings, run what-if scenarios, and compare them side by side.
+A local, backend-free compensation calculator that models a compensation
+plan exactly as extracted from an uploaded PDF (GitHub-style Revenue
+Compensation Exhibits, quotas, TIC weightings, base rates and accelerator
+tiers) and lets you calculate projected earnings, run what-if scenarios,
+and compare them side by side.
 
+The app ships with **no bundled/demo plan** - it only works once you upload
+a compensation plan PDF, since every team/geo has different numbers.
 Everything runs **entirely in your browser**. No data is sent anywhere -
-including uploaded plan PDFs, which are parsed client-side and never leave
-your machine.
+uploaded PDFs are parsed client-side and never leave your machine.
 
 **Live demo:** https://Akash1-dotcom.github.io/sales-dev-compensation-calculator/
 
@@ -72,35 +74,29 @@ specific plan's numbers**. It only understands the generic
 ## Supporting a new compensation plan PDF
 
 Different teams/geos are issued the same Exhibit template with different
-quotas, TIC weightings and accelerator tiers. Two ways to add one:
+quotas, TIC weightings and accelerator tiers. Upload it in the app - no
+code, no rebuild:
 
-### Option A - Upload it in the app (no code, no rebuild)
-
-1. Click **"Upload plan PDF"** in the header.
-2. Choose the team's compensation plan PDF - it's parsed entirely in your
-   browser (`src/engine/pdfPlanParser.ts` + `src/utils/pdfText.ts`, using
-   pdf.js) by matching the same structural anchors the GitHub template uses
-   (Component Quotas, Pipeline/SQL Rates tables, Draw schedule, etc.).
-3. Review the extracted plan in the editable JSON panel. Any field the
+1. On first load (or via **"Upload plan"** in the header once a plan is
+   already loaded), choose the team's compensation plan PDF - it's parsed
+   entirely in your browser (`src/engine/pdfPlanParser.ts` +
+   `src/utils/pdfText.ts`, using pdf.js) by matching the same structural
+   anchors the GitHub template uses (Component Quotas, Pipeline/SQL Rates
+   tables, Draw schedule, etc.).
+2. Review the extracted plan in the editable JSON panel. Any field the
    parser couldn't confidently locate is called out as a warning so you can
    fix it by hand before saving.
-4. Click **Save plan** - it's stored in your browser's `localStorage`
-   (`src/data/customPlans.ts`) and immediately appears in the plan selector
-   alongside the bundled plans. Nothing is uploaded anywhere, and no code
-   change or rebuild is needed.
-5. Uploaded plans can be removed at any time via the **"Remove plan"**
-   button next to the plan selector.
+3. Click **Save plan** - it's stored in your browser's `localStorage`
+   (`src/data/customPlans.ts`) and immediately becomes the active plan.
+   Nothing is uploaded anywhere, and no code change or rebuild is needed.
+4. Uploaded plans can be removed at any time via the **"Remove"** button
+   next to the plan selector; removing the last plan returns you to the
+   upload prompt.
 
-### Option B - Add it as a bundled JSON file (for a plan that should ship with the app)
-
-1. Read the new PDF and fill out a JSON file matching
-   `src/types/compensationPlan.ts` (copy
-   `src/data/plans/github-h1-fy27.plan.json` as a template - update quotas,
-   TIC weightings, base rates and accelerator tiers).
-2. Save it in `src/data/plans/your-plan.plan.json`.
-3. Import and add it to the `PLANS` array in `src/data/plans/index.ts`.
-4. Reload the app - the new plan appears in the plan selector dropdown and
-   every calculation, chart and comparison uses its data automatically.
+A plan can also be added at build time by dropping a JSON file matching
+`src/types/compensationPlan.ts` into `src/data/plans/` and registering it
+in `src/data/plans/index.ts`'s `PLANS` array - useful only if you want a
+plan to ship with the app by default (the app ships with none).
 
 ## Features
 
